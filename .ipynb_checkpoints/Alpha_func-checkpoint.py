@@ -1,0 +1,351 @@
+# coding: utf-8
+
+# In[ ]:
+
+import pandas as pd
+import numpy as np
+from scipy.stats import pearsonr, spearmanr
+
+'''Benchmark Price'''
+
+
+def BANCHMARKINDEXCLOSE():
+    return np.nan
+
+
+def BANCHMARKINDEXOPEN():
+    return np.nan
+
+
+'''Fama French 三因子 这里暂时也不做计算'''
+
+
+def HML():
+    return np.nan
+
+
+def SMB():
+    return np.nan
+
+
+def MKE():
+    return np.nan
+
+
+# RET,DTM和DBM我就直接在ipython notebook中定义过了
+'''
+def RET_func(CLOSE):
+#here I first use forwardfill then backfill to fill the NAN values, 
+#because the first digit of this DataFrame is NaN, so bfill method is required here.
+    return (CLOSE/CLOSE.shift(1) - 1).fillna(method = 'ffill').fillna(method='bfill')
+'''
+
+# 应该在系统里定义
+"""
+def DTM(OPEN, HIGH):
+    return (OPEN.values <= DELAY(OPEN, 1).values) \
+            * MAX(HIGH - OPEN, OPEN - DELAY(OPEN, 1))
+
+def DBM(OPEN, LOW):
+    return (OPEN >= DELAY(OPEN, 1).values) \
+            * MAX(OPEN - LOW, OPEN - DELAY(OPEN, 1))
+
+def TR():
+    return MAX(MAX(HIGH-LOW,ABS(HIGH-DELAY(CLOSE,1))),ABS(LOW-DELAY(CLOSE,1)) )
+
+def HD():
+    return HIGH-DELAY(HIGH,1)
+
+def LD(Data):
+    return DELAY(LOW,1)-LOW
+"""
+
+
+# 其实rank是个cross-sectional的符号
+def RANK(A, col_name):
+    return A.groupby(col_name).apply(lambda x:x.rank(ascending=True) / len(x))
+
+
+'''转换'''
+
+
+def LOG(A):
+    return A.apply(lambda x: np.log(x) if x > 0.00001 else np.log(0.00001))
+
+
+def ABS(A):
+    return np.abs(A)
+
+
+def SIGN(A):
+    return np.sign(A)
+
+
+def SIGN_POWER(A, d):
+    return (np.sign(A) * np.abs(A) ** d).fillna(method='ffill').fillna(method='bfill')
+
+
+'''单信号时间序列'''
+
+
+def DELAY(A, delay):
+    return A.shift(delay)#.fillna(method='ffill').fillna(method='bfill')
+
+
+def DELTA(A, n):
+    return (A - DELAY(A, delay=n)).fillna(method='ffill').fillna(method='bfill')
+
+
+def RET(A, n):
+    return (A / DELAY(A, delay=n) - 1).fillna(0)
+
+
+def SUM(A, n):
+    return A.rolling(window=n, min_periods=1, center=False).sum().fillna(method='ffill').fillna(method='bfill')
+
+
+def MEAN(A, n):
+    return A.rolling(window=n, min_periods=1, center=False).mean().fillna(method='ffill').fillna(method='bfill')
+
+
+def EWM(A, n):
+    return A.ewm(halflife=n).mean()
+
+
+def PROD(A, n):
+    return A.rolling(window=n, center=False, min_periods=1).apply(lambda x: np.prod(x)).fillna(method='ffill').fillna(
+        method='bfill')
+
+
+def STD(A, n):
+    return A.rolling(window=n, min_periods=1).std().fillna(method='ffill').fillna(method='bfill')
+
+
+def SKEW(A, n):
+    return A.rolling(window=n, min_periods=1, center=False).skew().fillna(method='ffill').fillna(method='bfill')
+
+
+def KURT(A, n):
+    return A.rolling(window=n, min_periods=1, center=False).kurt().fillna(method='ffill').fillna(method='bfill')
+
+
+def QUANTILE(A, n, d):
+    if d > 100:
+        d = 100
+    elif d < 0:
+        d = 0
+    return A.rolling(window=n, min_periods=1, center=False).apply(lambda x: np.percentile(x, d)).fillna(
+        method='ffill').fillna(method='bfill')
+
+
+def TSRANK(A, n):
+    return A.rolling(window=n, center=False).apply(lambda x: np.argsort(x).tolist().index(n - 1) / n).fillna(
+        method='ffill').fillna(method='bfill')
+
+
+def TSMIN(A, n):
+    return A.rolling(window=n, min_periods=1, center=False).min().fillna(
+        method='ffill').fillna(method='bfill')
+
+
+def TSMAX(A, n):
+    return A.rolling(window=n, min_periods=1, center=False).max().fillna(
+        method='ffill').fillna(method='bfill')
+
+
+def TS_ARGMIN(A, n):
+    return A.rolling(window=n).apply(lambda x: np.argsort(x)[0]).fillna(method='ffill').fillna(method='bfill')
+
+
+def TS_ARGMAX(A, n):
+    return A.rolling(window=n).apply(lambda x: np.argsort(x)[n - 1]).fillna(method='ffill').fillna(method='bfill')
+
+
+# 报告中写错了，这里应该是计算最小值到当前窗口的距离，因此作出调整
+def HIGHDAY(A, n):
+    return (n - 1) - A.rolling(window=n).apply(lambda x: np.argsort(x)[n - 1]).fillna(method='ffill').fillna(
+        method='bfill')
+
+
+def LOWDAY(A, n):
+    return (n - 1) - A.rolling(window=n).apply(lambda x: np.argsort(x)[0]).fillna(method='ffill').fillna(method='bfill')
+
+
+def ZSCORE(A, n):
+    zsocre = A.rolling(window=n, center=False).apply(lambda x: (x[-1] - np.mean(x)) / np.std(x))
+    if n <= 1:
+        return zsocre.fillna(1)
+    else:
+        return zsocre.fillna(method='ffill').fillna(method='bfill')
+
+
+def COUNT(condition, n):
+    cache = (condition).fillna(0)  # now condition is the boolean DataFrame/Series/Array
+    return cache.rolling(window=n, center=False, min_periods=1).sum()
+
+
+'''两个信号的交互'''
+
+
+def MAX(A, B):
+    return ((A > B) * A + (~(A >= B)) * B)
+
+
+def MIN(A, B):
+    return ((A > B) * B + (~(A >= B)) * A)
+
+
+# Fixed B
+def CORR(A, B, n):
+    cache = A.rolling(window=n, min_periods=1).corr(other=B).fillna(method='ffill').fillna(method='bfill')
+    cache = cache.replace(to_replace=[np.inf, -np.inf, np.nan], value=0)
+    return cache
+
+
+def COVIANCE(A, B, n):
+    cache = A.rolling(window=n, min_periods=1).cov(other=B).fillna(method='ffill')
+    cache = cache.replace([np.inf, -np.inf, np.nan], 0)
+    return cache
+
+
+def REGBETA(A, B, n):
+    assert (n == len(B))
+    regbeta = A.rolling(window=n, center=False).apply(lambda x: np.cov(x, B)[0][1] / np.var(B))
+    return regbeta.replace([np.inf, -np.inf], [np.nan, np.nan]).fillna(0)
+
+
+def ANGLE(A, B, n):
+    assert (n == len(B))
+    regbeta = A.rolling(window=n, center=False).apply(lambda x: np.cov(x, B)[0][1] / np.var(B))
+    return np.arctan(regbeta).replace([np.inf, -np.inf], [np.nan, np.nan]).fillna(0)
+
+
+def REGRESI(A, B, n):
+    assert (n == len(B))
+    regresi = A.rolling(window=n, center=False).apply(lambda x: x[-1] - B[-1] * np.cov(x, B)[0][1] / np.var(B))
+    return regresi.replace([np.inf, -np.inf], [np.nan, np.nan]).fillna(0)
+
+
+# Two Var
+
+def CORR2(A, B, n):
+    cache = pd.concat([A, B], axis=1).rolling(n).corr()
+    cache = cache[A.name][1::2]
+    cache.index = A.index
+    cache = cache.replace(to_replace=[np.inf, -np.inf, np.nan], value=0)
+    return cache
+
+
+def REGBETA2(A, B, n):
+    cache = pd.concat([A, B], axis=1).rolling(n).corr()
+    cache = cache[A.name][1::2]
+    cache.index = A.index
+    cache = cache * A.rolling(n).std(ddof=1)
+    cache = cache.replace(to_replace=[np.inf, -np.inf, np.nan], value=0)
+    return cache
+
+
+def ANGLE2(A, B, n):
+    cache = pd.concat([A, B], axis=1).rolling(n).corr()
+    cache = cache[A.name][1::2]
+    cache.index = A.index
+    cache = cache * A.rolling(n).std(ddof=1)
+    cache = cache.replace(to_replace=[np.inf, -np.inf, np.nan], value=0)
+    return np.arctan(cache).replace([np.inf, -np.inf], [np.nan, np.nan]).fillna(0)
+
+
+def REGRESI2(A, B, n):
+    cache = pd.concat([A, B], axis=1).rolling(n).corr()
+    cache = cache[A.name][1::2]
+    cache.index = A.index
+    cache = cache * A.rolling(n).std(ddof=1)
+    cache = cache.replace(to_replace=[np.inf, -np.inf, np.nan], value=0)
+    regresi = A - cache * B
+    return regresi.replace([np.inf, -np.inf], [np.nan, np.nan]).fillna(0)
+
+
+'''加权'''
+
+
+# 这里我加了一个assert，从直观意义出发
+def SMA(A, n, m):
+    assert n >= m  # 当n=m时SMA返回结果与原序列一致
+    cache = A.values
+    for i in range(1, len(A)):
+        A.values[i] = (A.values[i - 1] * (n - m) + cache[i - 1]) / n
+    return A.fillna(method='ffill').fillna(method='bfill')
+
+
+def SUMIF(A, n, condition):
+    return (A * condition).rolling(window=n, center=False, min_periods=1).sum().fillna(method='ffill').fillna(
+        method='bfill')
+
+
+'''
+报告中描述WMA()功能的原话是：
+计算A前n期样本加权平均值，权重为0.9i，(i表示样本距离当前时点的间隔)
+这个权值好像没有归一化，以下是按照归一化的结果写的
+更新后变为coef/100，而不是简单的0.9
+'''
+
+
+def WMA(A, n, coef):
+    w = np.arange(1, n + 1) * coef
+    w = w / w.sum()
+    return A.rolling(n).apply(lambda x: (x * w).sum()).fillna(method='ffill').fillna(method='bfill')
+
+
+def DECAYLINEAR(A, n):
+    w = np.arange(n, 0, -1)
+    w = w / w.sum()
+    return A.rolling(n).apply(lambda x: (x * w).sum()).fillna(method='ffill').fillna(method='bfill')
+
+
+def DECAYEXP(A, n, coef):
+    w = np.arange(1, n + 1) * (coef / 100.)
+    w = w / w.sum()
+    return A.rolling(n).apply(lambda x: (x * w).sum()).fillna(method='ffill').fillna(method='bfill')
+
+
+# Strange
+def FILTER(A, condition):
+    return A[condition]
+
+
+def SEQUENCE(m):
+    return np.arange(1, m + 1)
+
+
+def SUMAC(A, n):
+    return A.rolling(min_periods=1, window=n).sum().fillna(method='ffill').fillna(method='bfill')
+
+
+# ---后面增加的是一些我们WorldQuant以及JoinQuant101会用到的函数---
+
+# 这里的ADV返回的是这一个期货在最近n天交易的平均价格
+def ADV(n):
+    return np.nan
+
+
+# here is the function designed for dealing with np.inf
+def process_inf(alpha):
+    if ((alpha == np.inf) | (alpha == -np.inf)).any():
+        print('DataFrame has infinity values')
+    upper_bar = alpha.replace([np.inf, -np.inf], np.nan).dropna(how='all').max()
+    lower_bar = alpha.replace([np.inf, -np.inf], np.nan).dropna(how='all').min()
+
+    alpha = alpha.replace(to_replace=np.inf, value=upper_bar)
+    alpha = alpha.replace(to_replace=-np.inf, value=lower_bar)
+    return alpha
+
+
+def perasonr_hand(A, B):
+    A_new = process_inf(A)
+    B_new = process_inf(B)
+    return pearsonr(A_new, B_new)
+
+
+def spearmanr_hand(A, B):
+    A_new = process_inf(A)
+    B_new = process_inf(B)
+    return spearmanr(A_new, B_new)
